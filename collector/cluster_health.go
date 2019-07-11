@@ -40,8 +40,8 @@ type ClusterHealth struct {
 	client *http.Client
 	url    *url.URL
 
-	up                              prometheus.Gauge
-	totalScrapes, jsonParseFailures prometheus.Counter
+	up                              *prometheus.GaugeVec
+	totalScrapes, jsonParseFailures *prometheus.CounterVec
 
 	metrics      []*clusterHealthMetric
 	statusMetric *clusterHealthStatusMetric
@@ -56,18 +56,24 @@ func NewClusterHealth(logger log.Logger, client *http.Client, url *url.URL) *Clu
 		client: client,
 		url:    url,
 
-		up: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: prometheus.BuildFQName(namespace, subsystem, "up"),
-			Help: "Was the last scrape of the ElasticSearch cluster health endpoint successful.",
-		}),
-		totalScrapes: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: prometheus.BuildFQName(namespace, subsystem, "total_scrapes"),
-			Help: "Current total ElasticSearch cluster health scrapes.",
-		}),
-		jsonParseFailures: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: prometheus.BuildFQName(namespace, subsystem, "json_parse_failures"),
-			Help: "Number of errors while parsing JSON.",
-		}),
+		up: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: prometheus.BuildFQName(namespace, subsystem, "up"),
+				Help: "Was the last scrape of the ElasticSearch cluster health endpoint successful.",
+			},
+			[]string{"url"}),
+		totalScrapes: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: prometheus.BuildFQName(namespace, subsystem, "total_scrapes"),
+				Help: "Current total ElasticSearch cluster health scrapes.",
+			},
+			[]string{"url"}),
+		jsonParseFailures: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: prometheus.BuildFQName(namespace, subsystem, "json_parse_failures"),
+				Help: "Number of errors while parsing JSON.",
+			},
+			[]string{"url"}),
 
 		metrics: []*clusterHealthMetric{
 			{
@@ -216,9 +222,9 @@ func (c *ClusterHealth) Describe(ch chan<- *prometheus.Desc) {
 	}
 	ch <- c.statusMetric.Desc
 
-	ch <- c.up.Desc()
-	ch <- c.totalScrapes.Desc()
-	ch <- c.jsonParseFailures.Desc()
+	ch <- c.up.WithLabelValues(c.url.String()).Desc()
+	ch <- c.totalScrapes.WithLabelValues(c.url.String()).Desc()
+	ch <- c.jsonParseFailures.WithLabelValues(c.url.String()).Desc()
 }
 
 func (c *ClusterHealth) fetchAndDecodeClusterHealth() (clusterHealthResponse, error) {
@@ -247,7 +253,7 @@ func (c *ClusterHealth) fetchAndDecodeClusterHealth() (clusterHealthResponse, er
 	}
 
 	if err := json.NewDecoder(res.Body).Decode(&chr); err != nil {
-		c.jsonParseFailures.Inc()
+		c.jsonParseFailures.WithLabelValues(c.url.String()).Inc()
 		return chr, err
 	}
 
@@ -257,23 +263,18 @@ func (c *ClusterHealth) fetchAndDecodeClusterHealth() (clusterHealthResponse, er
 // Collect collects ClusterHealth metrics.
 func (c *ClusterHealth) Collect(ch chan<- prometheus.Metric) {
 	var err error
-	c.totalScrapes.Inc()
-	defer func() {
-		ch <- c.up
-		ch <- c.totalScrapes
-		ch <- c.jsonParseFailures
-	}()
+	c.totalScrapes.WithLabelValues(c.url.String()).Inc()
 
 	clusterHealthResp, err := c.fetchAndDecodeClusterHealth()
 	if err != nil {
-		c.up.Set(0)
+		c.up.WithLabelValues(c.url.String()).Set(0)
 		_ = level.Warn(c.logger).Log(
 			"msg", "failed to fetch and decode cluster health",
 			"err", err,
 		)
 		return
 	}
-	c.up.Set(1)
+	c.up.WithLabelValues(c.url.String()).Set(1)
 
 	for _, metric := range c.metrics {
 		ch <- prometheus.MustNewConstMetric(
@@ -292,4 +293,8 @@ func (c *ClusterHealth) Collect(ch chan<- prometheus.Metric) {
 			clusterHealthResp.ClusterName, color,
 		)
 	}
+
+	c.up.Collect(ch)
+	c.totalScrapes.Collect(ch)
+	c.jsonParseFailures.Collect(ch)
 }

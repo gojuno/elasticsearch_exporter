@@ -18,9 +18,9 @@ type IndicesSettings struct {
 	client *http.Client
 	url    *url.URL
 
-	up                              prometheus.Gauge
-	readOnlyIndices                 prometheus.Gauge
-	totalScrapes, jsonParseFailures prometheus.Counter
+	up                              *prometheus.GaugeVec
+	readOnlyIndices                 *prometheus.GaugeVec
+	totalScrapes, jsonParseFailures *prometheus.CounterVec
 }
 
 // NewIndicesSettings defines Indices Settings Prometheus metrics
@@ -30,31 +30,39 @@ func NewIndicesSettings(logger log.Logger, client *http.Client, url *url.URL) *I
 		client: client,
 		url:    url,
 
-		up: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: prometheus.BuildFQName(namespace, "indices_settings_stats", "up"),
-			Help: "Was the last scrape of the ElasticSearch Indices Settings endpoint successful.",
-		}),
-		totalScrapes: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: prometheus.BuildFQName(namespace, "indices_settings_stats", "total_scrapes"),
-			Help: "Current total ElasticSearch Indices Settings scrapes.",
-		}),
-		readOnlyIndices: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: prometheus.BuildFQName(namespace, "indices_settings_stats", "read_only_indices"),
-			Help: "Current number of read only indices within cluster",
-		}),
-		jsonParseFailures: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: prometheus.BuildFQName(namespace, "indices_settings_stats", "json_parse_failures"),
-			Help: "Number of errors while parsing JSON.",
-		}),
+		up: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: prometheus.BuildFQName(namespace, "indices_settings_stats", "up"),
+				Help: "Was the last scrape of the ElasticSearch Indices Settings endpoint successful.",
+			},
+			[]string{"url"}),
+		totalScrapes: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: prometheus.BuildFQName(namespace, "indices_settings_stats", "total_scrapes"),
+				Help: "Current total ElasticSearch Indices Settings scrapes.",
+			},
+			[]string{"url"}),
+		readOnlyIndices: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: prometheus.BuildFQName(namespace, "indices_settings_stats", "read_only_indices"),
+				Help: "Current number of read only indices within cluster",
+			},
+			[]string{"url"}),
+		jsonParseFailures: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: prometheus.BuildFQName(namespace, "indices_settings_stats", "json_parse_failures"),
+				Help: "Number of errors while parsing JSON.",
+			},
+			[]string{"url"}),
 	}
 }
 
 // Describe add Snapshots metrics descriptions
 func (cs *IndicesSettings) Describe(ch chan<- *prometheus.Desc) {
-	ch <- cs.up.Desc()
-	ch <- cs.totalScrapes.Desc()
-	ch <- cs.readOnlyIndices.Desc()
-	ch <- cs.jsonParseFailures.Desc()
+	ch <- cs.up.WithLabelValues(cs.url.String()).Desc()
+	ch <- cs.totalScrapes.WithLabelValues(cs.url.String()).Desc()
+	ch <- cs.readOnlyIndices.WithLabelValues(cs.url.String()).Desc()
+	ch <- cs.jsonParseFailures.WithLabelValues(cs.url.String()).Desc()
 }
 
 func (cs *IndicesSettings) getAndParseURL(u *url.URL, data interface{}) error {
@@ -79,7 +87,7 @@ func (cs *IndicesSettings) getAndParseURL(u *url.URL, data interface{}) error {
 	}
 
 	if err := json.NewDecoder(res.Body).Decode(data); err != nil {
-		cs.jsonParseFailures.Inc()
+		cs.jsonParseFailures.WithLabelValues(cs.url.String()).Inc()
 		return err
 	}
 	return nil
@@ -100,26 +108,19 @@ func (cs *IndicesSettings) fetchAndDecodeIndicesSettings() (IndicesSettingsRespo
 
 // Collect gets all indices settings metric values
 func (cs *IndicesSettings) Collect(ch chan<- prometheus.Metric) {
-
-	cs.totalScrapes.Inc()
-	defer func() {
-		ch <- cs.up
-		ch <- cs.totalScrapes
-		ch <- cs.jsonParseFailures
-		ch <- cs.readOnlyIndices
-	}()
+	cs.totalScrapes.WithLabelValues(cs.url.String()).Inc()
 
 	asr, err := cs.fetchAndDecodeIndicesSettings()
 	if err != nil {
-		cs.readOnlyIndices.Set(0)
-		cs.up.Set(0)
+		cs.readOnlyIndices.WithLabelValues(cs.url.String()).Set(0)
+		cs.up.WithLabelValues(cs.url.String()).Set(0)
 		_ = level.Warn(cs.logger).Log(
 			"msg", "failed to fetch and decode cluster settings stats",
 			"err", err,
 		)
 		return
 	}
-	cs.up.Set(1)
+	cs.up.WithLabelValues(cs.url.String()).Set(1)
 
 	var c int
 	for _, value := range asr {
@@ -127,5 +128,10 @@ func (cs *IndicesSettings) Collect(ch chan<- prometheus.Metric) {
 			c++
 		}
 	}
-	cs.readOnlyIndices.Set(float64(c))
+	cs.readOnlyIndices.WithLabelValues(cs.url.String()).Set(float64(c))
+
+	cs.up.Collect(ch)
+	cs.totalScrapes.Collect(ch)
+	cs.jsonParseFailures.Collect(ch)
+	cs.readOnlyIndices.Collect(ch)
 }

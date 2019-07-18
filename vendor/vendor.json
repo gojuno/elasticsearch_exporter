@@ -129,5 +129,5 @@
 			"revisionTime": "2017-12-17T18:08:21Z"
 		}
 	],
-	"rootPath": "github.com/justwatchcom/elasticsearch_exporter"
+	"rootPath": "github.com/gojuno/elasticsearch_exporter"
 }

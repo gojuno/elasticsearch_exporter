@@ -5,12 +5,35 @@ go:
   - 1.11.x
   - tip
 
+before_install:
+  # gox simplifies building for multiple architectures
+  - go get github.com/mitchellh/gox
+
 script:
   - make style
   - make vet
   - make gometalinter
   - make build
   - make test
+  - export VERSION=$(git describe --tags)
+  - gox -os="linux darwin" -arch="amd64" -output="elasticsearch_exporter_multicluster_${VERSION}_{{.OS}}_{{.Arch}}" -verbose ./...
+
+deploy:
+
+  provider: releases
+  skip_cleanup: true
+  api_key:
+    secure: U/ztEyA8Bn2kE48PL9m5do9VqSRCbh3cAEK8BR2q5BKaPnatbuTIu5W2Tabsbg/IAjj1n7d6yGSb8PrF/ZIYUve+vEI3mtBAis/TK0e/9I+il3UG/UYDO3pSUlwjyNLj/pH6XoPCD6RQyTry9CEW/D+N+PsMPojWcTnH2eCX0n//6UXVN+Y6ElvbWUG3SvwlJiAUX9EjZJKsfOF6JK6R+hR1oWBmVa43L0wlshB4Sn3fvNHqdM3o/exR841vZUkzMtdJaf/l0UBrtBL5hqokLa3/ykar4UjUgzCAlsfZY84JiH2TMkQsBleElX0zsx9ruWxyK8D+KIJh4ty1WKgFqNtGe6YkneQLvu4/6BF88pb/BOFAWtx75+eplD9IWYhyVJaxTbeuUdr2mzODR7srBOiIXZ2Shgcfo00d8XaEvAd74SahgME4zxuvpFGl9kSoajqAoaKf5z5Ny+H+DtruBdvpoPrFi6F8sqppq4ye2LD+z7iKKKf2jwmIiNBnrGxyqSZ2s+rC0Lgl6SBa6eqfsdmDd1ZksDLXsf6PSq7MLc3rZNP9QVk09jFJlj8gPnxk0b7BF8zX5EL1Cf0j0YFNHv4W4JhNod4OtT81knG40CxVdOaT090Vk+nWDwTfZfzap4hhkiECwcfFExIDr5NX9/g7deXlevybGEid9EuKFwU=
+  file_glob: true
+  file:
+    # The names of the binaries to output, based on the -output template passed to gox.
+    - "elasticsearch_exporter_multicluster_${VERSION}_darwin_amd64"
+    - "elasticsearch_exporter_multicluster_${VERSION}_linux_amd64"
+  on:
+    # What to repository to build
+    repo: gojuno/elasticsearch_exporter
+    # Only build binaries for tagged commits
+    tags: true
 
 matrix:
   allow_failures:

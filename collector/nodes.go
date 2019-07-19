@@ -170,7 +170,7 @@ type Nodes struct {
 
 // NewNodes defines Nodes Prometheus metrics
 func NewNodes(logger log.Logger, client *http.Client, url *url.URL, all bool, node string) *Nodes {
-	constLabels := ConstLabelsFromURL(url)
+	constLabels := constLabelsFromURL(url)
 	return &Nodes{
 		logger: logger,
 		client: client,

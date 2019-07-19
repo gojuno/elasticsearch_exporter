@@ -6,7 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func ConstLabelsFromURL(url *url.URL) prometheus.Labels {
+func constLabelsFromURL(url *url.URL) prometheus.Labels {
 	u := *url
 	u.User = nil
 	return map[string]string{

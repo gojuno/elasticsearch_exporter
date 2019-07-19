@@ -26,7 +26,7 @@ type ClusterSettings struct {
 
 // NewClusterSettings defines Cluster Settings Prometheus metrics
 func NewClusterSettings(logger log.Logger, client *http.Client, url *url.URL) *ClusterSettings {
-	constLabels := ConstLabelsFromURL(url)
+	constLabels := constLabelsFromURL(url)
 	return &ClusterSettings{
 		logger: logger,
 		client: client,

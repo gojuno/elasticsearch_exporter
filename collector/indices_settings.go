@@ -25,7 +25,7 @@ type IndicesSettings struct {
 
 // NewIndicesSettings defines Indices Settings Prometheus metrics
 func NewIndicesSettings(logger log.Logger, client *http.Client, url *url.URL) *IndicesSettings {
-	constLabels := ConstLabelsFromURL(url)
+	constLabels := constLabelsFromURL(url)
 	return &IndicesSettings{
 		logger: logger,
 		client: client,

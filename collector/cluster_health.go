@@ -50,7 +50,7 @@ type ClusterHealth struct {
 // NewClusterHealth returns a new Collector exposing ClusterHealth stats.
 func NewClusterHealth(logger log.Logger, client *http.Client, url *url.URL) *ClusterHealth {
 	subsystem := "cluster_health"
-	constLabels := ConstLabelsFromURL(url)
+	constLabels := constLabelsFromURL(url)
 
 	return &ClusterHealth{
 		logger: logger,

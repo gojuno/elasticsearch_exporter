@@ -52,7 +52,7 @@ type Snapshots struct {
 
 // NewSnapshots defines Snapshots Prometheus metrics
 func NewSnapshots(logger log.Logger, client *http.Client, url *url.URL) *Snapshots {
-	constLabels := ConstLabelsFromURL(url)
+	constLabels := constLabelsFromURL(url)
 	return &Snapshots{
 		logger: logger,
 		client: client,

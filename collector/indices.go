@@ -51,7 +51,7 @@ type Indices struct {
 
 // NewIndices defines Indices Prometheus metrics
 func NewIndices(logger log.Logger, client *http.Client, url *url.URL, shards bool) *Indices {
-	constLabels := ConstLabelsFromURL(url)
+	constLabels := constLabelsFromURL(url)
 
 	indexLabels := labels{
 		keys: func(...string) []string {
